@@ -1,0 +1,10 @@
+Planet,Diameter(km),Distance from sun(million km),Period of Revolution Around the Sun(1 planetary year) in days
+Mercury,4879,57.91,87.96,
+Venus,12104,108.2,224.68 
+Earth,12742,149.6,365.26
+Mars,6779,227.9,686.98
+Jupiter,139822,778.5,4329.63
+Saturn,116464,1427,10751.44
+Uranus,50724,2871,30685.55
+Neptune,49244,4497.1,60155.65
+Pluto,2372,5913,90410.5   
