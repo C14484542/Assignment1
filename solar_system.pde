@@ -1,48 +1,41 @@
 ArrayList<Planets> planets = new ArrayList<Planets>();
 DrawPlanets drawplanets = new DrawPlanets();
 
-import processing.video.*;
+//libraries
+import shapes3d.utils.*;
+import shapes3d.animation.*;
+import shapes3d.*;
 
-Capture video;
-
-PImage prevFrame;
-int blah = 0;
-float threshold = 150;
-int Mx = 0;
-int My = 0;
-int ave = 0;
-
-float ballX;
-float ballY;
-int rsp = 5;
-
-//loadData
+//variables for loadData()
 PImage galaxy;
-PShape sun, ufo;
+PShape menubox, sun, ufo, astro;
 String[] pimage = new String[9];
 String[] planetname = new String[9];
+PImage[] menuimg = new PImage[4];
 PImage[] planetimg = new PImage[9];
 PShape[] ball = new PShape[9];
 float[] planetsize = new float[9];
 float[] sundistance = new float[9];
 float[] revolution = new float[9];
 float[] sortd = new float[9];
-
 float minrev, maxrev;
 float highestd, lowestd, avgd; 
 
-boolean pressed = false;
-
+//variables for drawGraph()
 float barWidth;
-int option = 0;
-int moveplanet = 0;
 color[] colour = new color[9];
+float radiusx, radiusy;
 
 //variables for drawAxis()
 float border;
 float dataRange; 
 float windowRange; //length of the axis line 
 
+//variables for showPlanetData
+Ellipsoid planet, moon, stars;
+int planetno = 0;
+
+int option = 0;
 
 void setup()
 {
@@ -84,12 +77,12 @@ void setup()
     }
 
     planetname[i] = planets.get(i).planet;
-    sundistance[i] = map(planets.get(i).sun_distance, planets.get(0).sun_distance, planets.get(8).sun_distance, 200, 2000);
+    sundistance[i] = map(planets.get(i).sun_distance, planets.get(0).sun_distance, planets.get(8).sun_distance, 200, 5000);
     revolution[i] = map(planets.get(i).revolution, minrev, maxrev, 100, 500);
   }
 
   //mapping planet size
-  for (int i = 0; i < 9; i++)
+  for (int i = 0; i < planets.size(); i++)
   {
     if (i == 0 || i == 2 || i == 3 || i == 8)
     {
@@ -100,13 +93,37 @@ void setup()
     }
   }
 
-  ufo = loadShape("UFO.obj");
+  // Create the planet
+  planet = new Ellipsoid(this, 16, 16);
+  planet.setTexture(pimage[planetno]);
+  planet.setRadius(90);
+  planet.moveTo(new PVector(0, 0, 0));
+  planet.strokeWeight(1.0f);
+  planet.stroke(color(255, 255, 0));
+  planet.moveTo(20, 40, -80);
+  planet.tag = "Planet";
+  planet.drawMode(Shape3D.TEXTURE);
 
-  video = new Capture(this, 640, 480, 30);
-  video.start();
-  prevFrame = createImage(video.width, video.height, RGB);
-  ballX = width/2;
-  ballY = height/2;
+  // Create the moon
+  moon = new Ellipsoid(this, 15, 15);
+  moon.setTexture("moon.jpg");
+  moon.drawMode(Shape3D.TEXTURE);
+  moon.setRadius(20);
+  moon.moveTo(0, 0, 220);
+  moon.tag = "Moon";
+
+  // Create the star background
+  stars = new Ellipsoid(this, 10, 10);
+  stars.setTexture("stars01.jpg", 5, 5);
+  stars.drawMode(Shape3D.TEXTURE);
+  stars.setRadius(500);
+
+  // Add the moon to the planet this makes 
+  // its position relative to the planet's
+  planet.addShape(moon);
+
+  radiusx = width/2;
+  radiusy = height/2;
 }
 
 //loads all data
@@ -130,89 +147,92 @@ void loadData()
   //data for drawAxis()
   border = width * 0.08f;
   windowRange = (width - (border*2.0f));
-  dataRange = 139822;      
   barWidth =  windowRange / (float) (planets.size());
+
+  //obj files
+  ufo = loadShape("UFO.obj");
+  astro = loadShape("Astronaut.obj");
+
+  //menu images
+  for (int i = 0; i < menuimg.length; i++)
+  {
+    menuimg[i] = loadImage(i + ".png");
+  }
 }
 
-void move()
+//draws the main menu
+void menu()
 {
-  if (video.available()) {
-
-    prevFrame.copy(video, 0, 0, video.width, video.height, 0, 0, video.width, video.height); 
-    prevFrame.updatePixels();
-    video.read();
+  background(galaxy);
+  noStroke();
+  fill(255);
+  pushMatrix();
+  translate(width/10, height/2);
+  for (int i = 0; i < menuimg.length; i++)
+  {
+    pushMatrix();
+    translate(width/4 * i, 0);
+    rotateY(PI * frameCount/200);
+    menubox = createShape(BOX, 100);
+    menubox.setTexture(menuimg[i]);
+    shape(menubox);
+    popMatrix();
   }
+  popMatrix();
 
-  loadPixels();
-  video.loadPixels();
-  prevFrame.loadPixels();
+  fill(255, 0, 0);
+  textAlign(CENTER);
+  textSize(20);
+  text("Welcome to the solar sytem data visualisation\nPlease choose a box to navigate to different graphs", width/2, height/10);
+  text("Press ESC to exit", width/2, height/5);
 
-  Mx = 0;
-  My = 0;
-  ave = 0;
-
-
-  for (int x = 0; x < video.width; x ++ ) {
-    for (int y = 0; y < video.height; y ++ ) {
-
-      int loc = x + y*video.width;            
-      color current = video.pixels[loc];      
-      color previous = prevFrame.pixels[loc]; 
-
-
-      float r1 = red(current); 
-      float g1 = green(current); 
-      float b1 = blue(current);
-      float r2 = red(previous); 
-      float g2 = green(previous); 
-      float b2 = blue(previous);
-      float diff = dist(r1, g1, b1, r2, g2, b2);
-
-
-      if (diff > threshold) { 
-        pixels[loc] = video.pixels[loc];
-        Mx += x;
-        My += y;
-        ave++;
-      } else {
-
-        pixels[loc] = video.pixels[loc];
-      }
+  if ((mouseX > width/10 - 100) && (mouseX < width/10 + 100) && (mouseY >  height/2 - 50) && (mouseY < height/2 + 50))
+  {
+    fill(255);
+    text("Look at the visualised solar system", width/2, height/3);
+    if (mousePressed)
+    {
+      option = 1;
     }
   }
-  fill(255);
-  rect(0, 0, width, height);
-  if (ave != 0) { 
-    Mx = Mx/ave;
-    My = My/ave;
-  }
-  if (Mx > ballX + rsp/2 && Mx > 50) {
-    ballX+= rsp;
-  } else if (Mx < ballX - rsp/2 && Mx > 50) {
-    ballX-= rsp;
-  }
-  if (My > ballY + rsp/2 && My > 50) {
-    ballY+= rsp;
-  } else if (My < ballY - rsp/2 && My > 50) {
-    ballY-= rsp;
+
+  if ((mouseX > width/10 + width/4 - 100) && (mouseX < width/10 + width/4 + 100) && (mouseY >  height/2 - 50) && (mouseY < height/2 + 50))
+  {
+    fill(255);
+    text("Look at pie chart which shows data of the \nDiameter of the Planets", width/2, height/3);
+    if (mousePressed)
+    {
+      option = 2;
+    }
   }
 
-  updatePixels();
-  pushMatrix();
-  noStroke();
-  lights();
-  fill(255, 0, 255);
-  ellipse(ballX, ballY, 20, 20);
-  popMatrix();
+  if ((mouseX > width/10 + (width/4 * 2) - 100) && (mouseX < width/10 + (width/4 * 2) + 100) && (mouseY >  height/2 - 50) && (mouseY < height/2 + 50))
+  {
+    fill(255);
+    text("Look at the line graph which shows the data of the \nDistance from the Sun of the Planets", width/2, height/3);
+    if (mousePressed)
+    {
+      option = 3;
+    }
+  }
+
+  if ((mouseX > width/10 + (width/4 * 3) - 100) && (mouseX < width/10 + (width/4 * 3) + 100) && (mouseY >  height/2 - 50) && (mouseY < height/2 + 50))
+  {
+    fill(255);
+    text("Look at the bar graph which shows the data of the \nRevolution of Planets around the Sun", width/2, height/3);
+    if (mousePressed)
+    {
+      option = 4;
+    }
+  }
 }
-
-void drawAxis(ArrayList<Planets> planets, int horizIntervals, int verticalIntervals, float vertDataRange, float border)
+void drawAxis(int horizIntervals, int verticalIntervals, float vertDataRange)
 {
   stroke(200, 200, 200);
   // Draw the horizontal axis  
   line(border, height - border, width - border, height - border);
 
-  float windowRange = (width - (border * 2.0f));  
+  windowRange = (width - (border * 2.0f));  
   float tickSize = border * 0.1f;
 
   for (int i = 0; i <= horizIntervals; i ++)
@@ -235,14 +255,131 @@ void drawAxis(ArrayList<Planets> planets, int horizIntervals, int verticalInterv
   }
 }
 
-void drawGraph(ArrayList<Planets> planets)
+//method for drawing a pie chart which visualises diameter of planets
+void drawPieChart()
 {
-  background(galaxy);
+  background(0);
+  // Calculate the sum
+  float sum = 0.0f;
+  for (float f : planetsize)
+  {
+    sum += f;
+  }
+
+  // Calculate the angle to the mouse
+  float toMouseX = mouseX - radiusx;
+  float toMouseY = mouseY - radiusy;  
+  float angle = atan2(toMouseY, toMouseX);  
+  // We have to do this because 
+  // atan2 returns negative angles if y > 0 
+  if (angle < 0)
+  {
+    angle = map(angle, -PI, 0, PI, TWO_PI);
+  }
+
+  // The last angle
+  float last = 0;
+  // The cumulative sum of the dataset 
+  float cumulative = 0;
+  for (int i = 0; i < planetsize.length; i ++)
+  {
+    cumulative += planetsize[i];
+    // Calculate the surrent angle
+    float current = map(cumulative, 0, sum, 0, TWO_PI);
+    // Draw the pie segment
+    stroke(colour[i]);
+    fill(colour[i]);
+
+    float rx = radiusx;
+    float ry = radiusy;
+    // If the mouse angle is inside the pie segment
+    if (angle > last && angle < current)
+    {
+      rx = radiusx * 1.5f;
+      ry = radiusy * 1.5f;
+
+      textSize(20);
+      textAlign(CENTER);
+      text("Diameter of Planets", width/2, 60);
+      text("Planet: " + planetname[i], width/2, height - 80);
+      text("Diameter: " + planetsize[i] + "km", width/2, height - 60);
+    }
+
+    // Draw the arc
+    arc(
+      radiusx
+      , radiusy
+      , rx
+      , ry
+      , last
+      , current
+      );
+    last = current;
+  }
+
+  stroke(255);
+  line(radiusx, radiusy, mouseX, mouseY);
+
+  fill(255);
+  textSize(15);
+  textAlign(RIGHT);
+  text("Press backspace to go back to main menu", width, 20);
+}
+
+//method for drawing a line graph which visualises planets' distance from the sun
+void drawLineGraph()
+{
+  background(0);
+  textSize(20);
+  fill(255, 0, 0);
+  drawAxis(5, 10, 5913);
+  for (int i = 1; i < planets.size(); i ++)
+  {
+    stroke(colour[i-1]);
+    fill(colour[i-1]);
+    float x1 = map(i-1, 0, planets.size(), border, width - border);
+    float x2 = map(i, 0, planets.size(), border, width - border);
+    float y1 = map(planets.get(i-1).sun_distance, 0, 5913, height - border, border);
+    float y2 = map(planets.get(i).sun_distance, 0, 5913, height - border, border);
+    line(x1, y1, x2, y2);
+    ellipse(x1, y1, 10, 10);
+    textSize(15);
+    textAlign(CENTER);
+    if (i == planets.size() - 1)
+    {
+      ellipse(x2, y2, 10, 10);
+      if (mouseX > x2 - 5 && mouseX < x2 + 5 && mouseY > y2 - 5 && mouseY < y2 + 5)
+      {
+        text("Planet: " + planets.get(i).planet, width/2, height/3);
+        text("Distance from sun: " + planets.get(i).sun_distance + "million km", width/2, height/3 + 20);
+      }
+    }
+    if (mouseX > x1 - 5 && mouseX < x1 + 5 && mouseY > y1 - 5 && mouseY < y1 + 5)
+    {
+      text("Planet: " + planets.get(i-1).planet, width/2, height/3);
+      text("Distance from sun: " + planets.get(i-1).sun_distance + "million km", width/2, height/3 + 20);
+    }
+    pushMatrix();
+    stroke(255,0,0);
+    text("Distance of Planets from the Sun", width/2, 30);
+    text("Hover the mouse over the points in the graph to show exact distance", width/2, 50);
+    popMatrix();
+  }//end for
+  fill(255);
+  textSize(15);
+  textAlign(RIGHT);
+  text("Press backspace to go back to main menu", width, 20);
+}
+
+//method for drawing a bar graph which visualises planets' revolution around the sun
+void drawBarGraph()
+{
+  background(0);
   for (int i = 0; i < planets.size (); i++)
   { 
-    drawAxis(planets, 10, 10, dataRange, border);
+    drawAxis(10, 10, 90410.5);
     float xbar = map(i, 0, planets.size(), border, border + windowRange);
-    float ybar = map(planets.get(i).diameter, 0, dataRange, height - border, border);
+    float ybar = map(planets.get(i).revolution, 0, 90410.5, height - border, border);
     stroke(colour[i]);
     fill(colour[i]);
     rect(xbar, height-border, barWidth, -(height-border-ybar));
@@ -250,42 +387,116 @@ void drawGraph(ArrayList<Planets> planets)
     //text for graph labels
     textAlign(CENTER);
     fill(250, 0, 0);
-    text("Diameter of Planets", width/2, 30);
+    text("Period of Revolution around the Sun", width/2, 30);
+    text("Hover the mouse over the bars to show exact number of days of revolution", width/2, 50);
     text("Planets", width/2, height - 10);
-    text("D\ni\na\nm\ne\nt\ne\nr", 10, height/2);
+    text("N\no.\n\no\nf\n\nD\na\ny\ns", 10, height/2);
 
     //text for countries in the bar
     pushMatrix();
-    //translate(border + 20 + i * barWidth, height-border);
     textAlign(LEFT);
     fill(colour[i]);
     text(planetname[i], border + 20 + i * barWidth, height-border+20);
     popMatrix();
+
+    fill(255);
+    textSize(15);
+    textAlign(RIGHT);
+    text("Press backspace to go back to main menu", width, 20);
+
+    if (i == 0)
+    {
+      if (mouseX > xbar && mouseX < xbar + barWidth && mouseY < height - border && mouseY > height-border-10)
+      {
+        text("Planet name: " + planetname[i], width/2, height/5);
+        text("Revolution around the sun : " + planets.get(i).revolution, width/2, height/5 + 20);
+      }
+    }
+    if (mouseX > xbar && mouseX < xbar + barWidth && mouseY < height - border && mouseY > ybar)
+    {
+      pushMatrix();
+      textAlign(CENTER);
+      text("Planet name: " + planetname[i], width/2, height/5);
+      text("Revolution around the sun : " + planets.get(i).revolution, width/2, height/5 + 20); 
+      popMatrix();
+    }
   }
 }
 
+void showPlanetdata()
+{
+  background(0);
+  pushStyle();
+  // Change the rotations before drawing
+  planet.rotateBy(0, radians(0.6f), 0);
+  moon.rotateBy(radians(0.5f), radians(1.0f), 0);
+  stars.rotateBy(0, 0, radians(0.02f));
 
+  pushMatrix();
+  camera(0, -190, 350, 0, 0, 0, 0, 1, 0);
+  planet.setTexture(pimage[planetno]);
+  // Draw the planet (will cause all added shapes
+  // to be drawn i.e. the moon)
+  planet.draw();
+
+  stars.draw();
+  popMatrix();
+  popStyle();
+
+  fill(255);
+  textSize(15);
+  textAlign(CENTER);
+  text("Planet Name: " + planetname[planetno], width/2, height/10);
+  text("Planet Diameter: " + planetsize[planetno] + " km", width/2, height/10 + 20);
+  text("Distance from Sun: " + sundistance[planetno] + " million km", width/2, height/10 + 40);
+  text("Orbital Period: " + revolution[planetno] + " days", width/2, height/10 + 60);
+
+  fill(255);
+  textSize(10);
+  textAlign(RIGHT);
+  text("Press backspace to go back to main menu", width, 20);
+}
 
 void draw()
 {
-  move();
-  
-  println(moveplanet);
-  if (ballX < width/2 - 50)
+  background(0);
+
+  if (keyPressed)
   {
-    ballX = width/2;
-    moveplanet = 1;
+    if (key == BACKSPACE)
+    {
+      option = 0;
+    }
   }
-  if(ballX > width/2 + 50)
+
+  if (option == 0)
   {
-    ballX = width/2;
-    moveplanet = 2;
+    menu();
   }
 
   if (option == 1)
   {
-    drawGraph(planets);
+    drawplanets.update();
+    drawplanets.render();
   }
-  drawplanets.update();
-  drawplanets.render();
+
+  if (option == 2)
+  {
+    drawPieChart();
+  }
+
+  if (option == 3)
+  {
+    drawLineGraph();
+  }
+
+  if (option == 4)
+  {
+    drawBarGraph();
+  }
+
+  if (option == 5)
+  {
+    showPlanetdata();
+  }
 }
